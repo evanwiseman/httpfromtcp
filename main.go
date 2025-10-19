@@ -11,46 +11,52 @@ const (
 	filename = "messages.txt"
 )
 
+func getLinesChannel(f io.ReadCloser) <-chan string {
+	ch := make(chan string)
+
+	go func() {
+		defer close(ch)
+		var line string
+		for {
+			buffer := make([]byte, 8)
+
+			// Read file into buffer until EOF
+			n, err := f.Read(buffer)
+			if err == io.EOF {
+				break
+			}
+			if err != nil {
+				return
+			}
+
+			// Send to ch until last new line
+			parts := strings.Split(string(buffer[:n]), "\n")
+			line += parts[0]
+			for _, part := range parts[1:] {
+				ch <- line
+				line = part
+			}
+		}
+		// Ensure everything is read
+		if line != "" {
+			ch <- line
+		}
+	}()
+
+	return ch
+}
+
 func main() {
-	file, err := os.Open(filename)
+	// Open the file
+	f, err := os.Open(filename)
 	if err != nil {
 		os.Exit(1)
 	}
+	defer f.Close()
 
-	// Store the current line to output
-	var currentLine string
-	for {
-		// Byte slice of size 8
-		buffer := make([]byte, 8)
-
-		// Read file into buffer
-		n, err := file.Read(buffer)
-
-		if err == io.EOF {
-			break
-		}
-		if err != nil {
-			os.Exit(2)
-		}
-
-		// Split buffer into parts and add first part to current line
-		parts := strings.Split(string(buffer[:n]), "\n")
-
-		// Append
-		currentLine += parts[0]
-
-		// iterate through parts
-		for i, part := range parts {
-			if i == 0 {
-				continue
-			}
-			fmt.Printf("read: %s\n", currentLine) // print current line
-			currentLine = ""                      // reset current line
-			currentLine += part                   // add to current line
-		}
-	}
-
-	if currentLine != "" { // ensure we've read everything
-		fmt.Printf("read: %s\n", currentLine)
+	// Read all lines from the channel
+	linesCh := getLinesChannel(f)
+	for line := range linesCh {
+		fmt.Printf("read: %s\n", line)
 	}
 }
