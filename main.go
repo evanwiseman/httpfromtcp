@@ -9,14 +9,18 @@ import (
 )
 
 const (
-	filename = "messages.txt"
+	addr = ":42069"
 )
 
 func getLinesChannel(f io.ReadCloser) <-chan string {
 	ch := make(chan string)
+	log.Printf("[INFO] Opened read channel")
 
 	go func() {
-		defer close(ch)
+		defer func() {
+			close(ch)
+			log.Printf("[INFO] Closed read channel")
+		}()
 		var line string
 		for {
 			buffer := make([]byte, 8)
@@ -27,6 +31,7 @@ func getLinesChannel(f io.ReadCloser) <-chan string {
 				break
 			}
 			if err != nil {
+				log.Printf("[ERROR] Error reading from stream: %v", err)
 				return
 			}
 
@@ -48,27 +53,25 @@ func getLinesChannel(f io.ReadCloser) <-chan string {
 }
 
 func main() {
-	listener, err := net.Listen("tcp", "localhost:42069")
+	listener, err := net.Listen("tcp", addr)
 	if err != nil {
-		log.Fatalf("Failed to open listener: %v", err)
+		log.Fatalf("[FATAL] Failed to open listener: %v", err)
 	}
 	defer listener.Close()
-	log.Println("Successfully opened listener")
+	log.Printf("[INFO] Server started on: %s", addr)
 
 	for {
 		conn, err := listener.Accept()
 		if err != nil {
-			log.Fatalf("Unable to accept connection: %v", err)
+			log.Fatalf("[ERROR] Unable to accept connection: %v", err)
 		}
-		log.Println("Successfully accepted connection")
+		log.Printf("[INFO] Accepted new connection from: %s", conn.RemoteAddr().String())
 
 		// Read all lines from the channel
 		linesCh := getLinesChannel(conn)
 		for line := range linesCh {
 			fmt.Printf("%s\n", line)
 		}
-		<-linesCh
-		log.Println("Successfully closed channel")
 	}
 
 }
