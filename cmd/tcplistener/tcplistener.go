@@ -30,7 +30,7 @@ func main() {
 		if err != nil {
 			log.Fatalf("[ERROR] Unable to read data: %v", err)
 		}
-		request.PrintRequestLine(req.RequestLine)
+		request.PrintRequest(req)
 	}
 
 }

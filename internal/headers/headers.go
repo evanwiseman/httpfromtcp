@@ -28,6 +28,9 @@ func (h Headers) Parse(data []byte) (n int, done bool, err error) {
 	}
 
 	colonIdx := strings.Index(line, ":")
+	if colonIdx == -1 {
+		return 0, false, fmt.Errorf("error: invalid header")
+	}
 	fieldName := line[:colonIdx]
 	fieldValue := line[colonIdx+1:]
 	if len(fieldName) == 0 || fieldName[len(fieldName)-1] == ' ' || fieldName[len(fieldName)-1] == '\t' {
