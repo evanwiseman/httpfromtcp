@@ -7,6 +7,7 @@ import (
 	"strings"
 )
 
+const crlf = "\r\n"
 const bufferSize = 8
 
 type ParserState int
@@ -90,11 +91,11 @@ func isCapitalized(s string) bool {
 }
 
 func parseRequestLine(text string) (int, RequestLine, error) {
-	if !strings.Contains(text, "\r\n") {
+	if !strings.Contains(text, crlf) {
 		return 0, RequestLine{}, nil
 	}
 
-	line := strings.Split(text, "\r\n")[0]
+	line := strings.Split(text, crlf)[0]
 	n := len(line)
 	tokens := strings.Split(string(line), " ")
 
