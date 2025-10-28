@@ -1,6 +1,7 @@
 package request
 
 import (
+	"errors"
 	"fmt"
 	"io"
 	"strings"
@@ -51,9 +52,9 @@ type RequestLine struct {
 func RequestFromReader(reader io.Reader) (*Request, error) {
 	buf := make([]byte, bufferSize)
 	readToIndex := 0
-	request := &Request{State: ParserInitialized}
+	req := &Request{State: ParserInitialized}
 
-	for request.State != ParserDone {
+	for req.State != ParserDone {
 		// Resize buffer to twice current size if full
 		if readToIndex >= cap(buf) {
 			new_buf := make([]byte, len(buf)*2)
@@ -62,22 +63,26 @@ func RequestFromReader(reader io.Reader) (*Request, error) {
 		}
 
 		// Read until the buffer is filled starting at readIndex
-		n, err := reader.Read(buf[readToIndex:])
-		if err == io.EOF {
-			break
+		numBytesRead, err := reader.Read(buf[readToIndex:])
+		if err != nil {
+			if errors.Is(err, io.EOF) {
+				req.State = ParserDone
+				break
+			}
+			return nil, err
 		}
-		readToIndex += n
+		readToIndex += numBytesRead
 
 		// Try to parse the request
-		n, err = request.parse(buf)
+		numBytesParsed, err := req.parse(buf)
 		if err != nil {
 			return nil, err
 		}
 		// Copy the buffer if we parsed bytes
-		copy(buf, buf[n:])
-		readToIndex -= n
+		copy(buf, buf[numBytesParsed:])
+		readToIndex -= numBytesParsed
 	}
-	return request, nil
+	return req, nil
 }
 
 func isCapitalized(s string) bool {
@@ -114,4 +119,11 @@ func parseRequestLine(text string) (int, RequestLine, error) {
 		RequestTarget: target,
 		HttpVersion:   version,
 	}, nil
+}
+
+func PrintRequestLine(rl RequestLine) {
+	fmt.Println("Request line:")
+	fmt.Printf("- Method: %s\n", rl.Method)
+	fmt.Printf("- Target: %s\n", rl.RequestTarget)
+	fmt.Printf("- Version: %s\n", rl.HttpVersion)
 }
