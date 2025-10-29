@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"strconv"
 	"strings"
 
 	"github.com/evanwiseman/httpfromtcp/internal/headers"
@@ -18,6 +19,7 @@ type ParserState int
 const (
 	ParserInitialized ParserState = iota
 	ParserHeaders
+	ParserBody
 	ParserDone
 )
 
@@ -30,6 +32,7 @@ type RequestLine struct {
 type Request struct {
 	RequestLine RequestLine
 	Headers     headers.Headers
+	Body        []byte
 	State       ParserState
 }
 
@@ -67,13 +70,31 @@ func (r *Request) parseSingle(data []byte) (n int, err error) {
 		if err != nil { // something went wrong
 			return 0, err
 		}
-		if n == 0 { // need more data
-			return 0, nil
-		}
 		if done {
-			r.State = ParserDone
+			r.State = ParserBody
 		}
 		return n, nil
+	case ParserBody:
+		lengthStr, ok := r.Headers.Get("content-length")
+		if !ok {
+			r.State = ParserDone
+			return 0, nil
+		}
+		r.Body = append(r.Body, data...)
+
+		length, err := strconv.Atoi(lengthStr)
+		if err != nil {
+			return 0, fmt.Errorf("error: invalid content-length: %w", err)
+		}
+
+		if len(r.Body) > length {
+			return 0, fmt.Errorf("error: body is larger than content-length %v != %v", len(r.Body), length)
+		}
+		if len(r.Body) == length {
+			r.State = ParserDone
+		}
+
+		return len(data), nil
 	case ParserDone:
 		return 0, fmt.Errorf("error: trying to read data in a done state")
 	default:
@@ -133,7 +154,11 @@ func requestLineFromString(str string) (*RequestLine, error) {
 func RequestFromReader(reader io.Reader) (*Request, error) {
 	buf := make([]byte, bufferSize)
 	readToIndex := 0
-	req := &Request{Headers: headers.NewHeaders(), State: ParserInitialized}
+	req := &Request{
+		Headers: headers.NewHeaders(),
+		State:   ParserInitialized,
+		Body:    make([]byte, 0),
+	}
 
 	for req.State != ParserDone {
 		// Resize buffer to twice current size if full
@@ -150,6 +175,9 @@ func RequestFromReader(reader io.Reader) (*Request, error) {
 				req.State = ParserDone
 				break
 			}
+			if req.State != ParserDone {
+				return nil, fmt.Errorf("incomplete request: %w", err)
+			}
 			return nil, err
 		}
 		readToIndex += numBytesRead
@@ -164,6 +192,7 @@ func RequestFromReader(reader io.Reader) (*Request, error) {
 		copy(buf, buf[numBytesParsed:])
 		readToIndex -= numBytesParsed
 	}
+
 	return req, nil
 }
 
@@ -177,4 +206,7 @@ func PrintRequest(req *Request) {
 	for k, v := range req.Headers {
 		fmt.Printf("- %s: %s\n", k, v)
 	}
+
+	fmt.Println("Body:")
+	fmt.Println(string(req.Body))
 }
