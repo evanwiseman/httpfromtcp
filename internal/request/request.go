@@ -172,12 +172,12 @@ func RequestFromReader(reader io.Reader) (*Request, error) {
 		numBytesRead, err := reader.Read(buf[readToIndex:])
 		if err != nil {
 			if errors.Is(err, io.EOF) {
-				req.State = ParserDone
+				if req.State != ParserDone {
+					return nil, fmt.Errorf("incomplete request: %w", err)
+				}
 				break
 			}
-			if req.State != ParserDone {
-				return nil, fmt.Errorf("incomplete request: %w", err)
-			}
+
 			return nil, err
 		}
 		readToIndex += numBytesRead

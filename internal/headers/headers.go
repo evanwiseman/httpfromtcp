@@ -18,6 +18,10 @@ func (h Headers) Get(key string) (value string, ok bool) {
 	return value, ok
 }
 
+func (h Headers) Set(key string, value string) {
+	h[key] = value
+}
+
 func (h Headers) Parse(data []byte) (n int, done bool, err error) {
 	text := string(data)
 	crlfIdx := strings.Index(text, crlf)
