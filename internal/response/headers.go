@@ -9,9 +9,9 @@ import (
 
 func GetDefaultHeaders(contentLen int) headers.Headers {
 	h := headers.NewHeaders()
-	h["Content-Length"] = fmt.Sprint(contentLen)
-	h["Connection"] = "close"
-	h["Content-Type"] = "text/html"
+	h.Set("Content-Length", fmt.Sprint(contentLen))
+	h.Set("Connection", "close")
+	h.Set("Content-Type", "text/html")
 	return h
 }
 

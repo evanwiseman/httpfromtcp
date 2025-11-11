@@ -48,6 +48,11 @@ func (w *Writer) WriteChunkedBody(p []byte) (int, error) {
 	return w.WriteBody([]byte(fmt.Sprintf("%X\r\n%s\r\n", numBytes, p)))
 }
 
-func (w *Writer) WriteChunkedBodyDone() (int, error) {
-	return w.WriteChunkedBody(nil)
+func (w *Writer) WriteChunkedBodyDone() error {
+	_, err := w.writer.Write([]byte("0\r\n"))
+	return err
+}
+
+func (w *Writer) WriteTrailers(h headers.Headers) error {
+	return w.WriteHeaders(h)
 }

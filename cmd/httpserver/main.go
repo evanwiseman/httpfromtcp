@@ -1,7 +1,10 @@
 package main
 
 import (
+	"crypto/sha256"
+	"encoding/hex"
 	"errors"
+	"fmt"
 	"io"
 	"log"
 	"net/http"
@@ -113,13 +116,16 @@ func handlerHttpbin(w *response.Writer, r *request.Request) {
 	res.Header.Del("content-length")
 
 	header := headers.NewHeaders()
-	header.Set("transfer-encoding", "chunked")
-	header.Set("content-type", res.Header.Get("content-type"))
+	header.Set("Transfer-Encoding", "Chunked")
+	header.Set("Content-Type", res.Header.Get("Content-Type"))
+	header.Set("Trailer", "X-Content-SHA256, X-Content-Length")
 	w.WriteStatusLine(response.StatusOk)
 	w.WriteHeaders(header)
+	log.Print(header)
 	length := 0
 	buf := make([]byte, 1024)
 
+	var body []byte
 	for {
 		n, err := res.Body.Read(buf)
 		if err != nil {
@@ -130,12 +136,18 @@ func handlerHttpbin(w *response.Writer, r *request.Request) {
 			return
 		}
 		length += n
-
+		body = append(body, buf[:n]...)
 		if _, err := w.WriteChunkedBody(buf[:n]); err != nil {
 			handler400(w, r)
 			return
 		}
 	}
-
 	w.WriteChunkedBodyDone()
+
+	hash := sha256.Sum256(body)
+
+	trailer := headers.NewHeaders()
+	trailer.Set("X-Content-SHA256", hex.EncodeToString(hash[:]))
+	trailer.Set("X-Content-Length", fmt.Sprintf("%d", length))
+	w.WriteTrailers(trailer)
 }
