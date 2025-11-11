@@ -49,6 +49,10 @@ func handler(w *response.Writer, r *request.Request) {
 		handlerHttpbin(w, r)
 		return
 	}
+	if r.RequestLine.RequestTarget == "/video" {
+		handlerVideo(w, r)
+		return
+	}
 	handler200(w, r)
 
 }
@@ -150,4 +154,20 @@ func handlerHttpbin(w *response.Writer, r *request.Request) {
 	trailer.Set("X-Content-SHA256", hex.EncodeToString(hash[:]))
 	trailer.Set("X-Content-Length", fmt.Sprintf("%d", length))
 	w.WriteTrailers(trailer)
+}
+
+func handlerVideo(w *response.Writer, r *request.Request) {
+	videoBytes, err := os.ReadFile("assets/vim.mp4")
+	if err != nil {
+		handler500(w, r)
+		return
+	}
+
+	w.WriteStatusLine(response.StatusOk)
+	header := headers.NewHeaders()
+	header.Set("Content-Type", "video/mp4")
+	header.Set("Content-Length", fmt.Sprintf("%d", len(videoBytes)))
+	header.Set("Connection", "close")
+	w.WriteHeaders(header)
+	w.WriteBody(videoBytes)
 }
