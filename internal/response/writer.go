@@ -2,23 +2,24 @@ package response
 
 import (
 	"fmt"
+	"io"
 	"net"
 
 	"github.com/evanwiseman/httpfromtcp/internal/headers"
 )
 
 type Writer struct {
-	conn net.Conn
+	writer io.Writer
 }
 
 func NewWriter(conn net.Conn) *Writer {
 	return &Writer{
-		conn: conn,
+		writer: conn,
 	}
 }
 
 func (w *Writer) WriteStatusLine(statusCode StatusCode) error {
-	if err := WriteStatusLine(w.conn, statusCode); err != nil {
+	if err := WriteStatusLine(w.writer, statusCode); err != nil {
 		return err
 	}
 
@@ -26,34 +27,27 @@ func (w *Writer) WriteStatusLine(statusCode StatusCode) error {
 }
 
 func (w *Writer) WriteHeaders(headers headers.Headers) error {
-	if err := WriteHeaders(w.conn, headers); err != nil {
+	if err := WriteHeaders(w.writer, headers); err != nil {
 		return err
 	}
 
 	return nil
 }
 
-func (w *Writer) WriteBody(p []byte) error {
-	_, err := w.conn.Write(p)
+func (w *Writer) WriteBody(p []byte) (int, error) {
+	n, err := w.writer.Write(p)
 	if err != nil {
-		return err
+		return 0, err
 	}
 
-	return nil
+	return n, nil
 }
 
-func (w *Writer) Write(statusCode StatusCode, body []byte) error {
-	if err := w.WriteStatusLine(statusCode); err != nil {
-		return fmt.Errorf("error: failed to write status line: %w", err)
-	}
+func (w *Writer) WriteChunkedBody(p []byte) (int, error) {
+	numBytes := len(p)
+	return w.WriteBody([]byte(fmt.Sprintf("%X\r\n%s\r\n", numBytes, p)))
+}
 
-	headers := GetDefaultHeaders(len(body))
-	if err := w.WriteHeaders(headers); err != nil {
-		return fmt.Errorf("error: failed to write headers: %w", err)
-	}
-
-	if err := w.WriteBody(body); err != nil {
-		return fmt.Errorf("error: failed to write body: %w", err)
-	}
-	return nil
+func (w *Writer) WriteChunkedBodyDone() (int, error) {
+	return w.WriteChunkedBody(nil)
 }

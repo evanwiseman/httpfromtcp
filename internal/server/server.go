@@ -55,16 +55,16 @@ func (s *Server) handle(conn net.Conn) {
 	defer conn.Close()
 
 	req, err := request.RequestFromReader(conn)
-	writer := response.NewWriter(conn)
+	w := response.NewWriter(conn)
 	if err != nil {
-		writer.Write(
-			response.StatusBadRequest,
-			[]byte(err.Error()),
-		)
+		w.WriteStatusLine(response.StatusBadRequest)
+		body := []byte(fmt.Sprintf("error parsing request: %v", err))
+		w.WriteHeaders(response.GetDefaultHeaders(len(body)))
+		w.WriteBody(body)
 		return
 	}
 
-	s.handler(writer, req)
+	s.handler(w, req)
 }
 
 type Handler func(w *response.Writer, req *request.Request)
